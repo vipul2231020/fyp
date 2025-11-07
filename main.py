@@ -58,12 +58,12 @@ def predict():
             "confidence": f"{confidence * 100:.2f}%",
             "fault_percentage": fault_percentage,
             "severity": severity,
-            "probabilities": {
-                "Normal": round(proba[0] * 100, 2),
-                "Crack_Left": round(proba[1] * 100, 2),
-                "Crack_Right": round(proba[2] * 100, 2),
-                "Break": round(proba[3] * 100, 2)
-            }
+            # "probabilities": {
+            #     "Normal": round(proba[0] * 100, 2),
+            #     "Crack_Left": round(proba[1] * 100, 2),
+            #     "Crack_Right": round(proba[2] * 100, 2),
+            #     "Break": round(proba[3] * 100, 2)
+            # }
         })
 
     except Exception as e:
