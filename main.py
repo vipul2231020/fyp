@@ -1,6 +1,6 @@
-from flask import Flask, render_template, request
+from flask import Flask, request, jsonify, render_template
 import pickle
-import pandas as pd
+import numpy as np
 
 app = Flask(__name__)
 
@@ -12,39 +12,34 @@ status_map = {0: "Normal", 1: "Crack_Left", 2: "Crack_Right", 3: "Break"}
 
 @app.route('/')
 def home():
-    return render_template('index.html', prediction=None)
+    return jsonify({"message": "API is live! Use POST /predict to get results."})
 
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
-        # Get input from user form
-        left_sensor = int(request.form['left_sensor'])
-        right_sensor = int(request.form['right_sensor'])
+        data = request.get_json(force=True)  # ✅ force=True fixes bad request
+        left = data.get("left_sensor")
+        right = data.get("right_sensor")
 
-        # Prepare input
-        test_input = pd.DataFrame([[left_sensor, right_sensor]], columns=['left_sensor', 'right_sensor'])
+        # input validation
+        if left is None or right is None:
+            return jsonify({"error": "Missing left_sensor or right_sensor"}), 400
 
-        # Predict
-        pred = model.predict(test_input)[0]
-        proba = model.predict_proba(test_input)[0]
+        input_data = np.array([[left, right]])
+        pred = model.predict(input_data)[0]
+        proba = model.predict_proba(input_data)[0]
+
         pred_class = status_map[pred]
+        fault_percentage = round(proba[pred] * 100, 2)
 
-        # Fault percentage logic
-        if pred_class == "Normal":
-            fault_percentage = round((1 - proba[0]) * 100, 2)
-        else:
-            fault_percentage = round(proba[pred] * 100, 2)
-
-        return render_template(
-            'index.html',
-            prediction=pred_class,
-            fault_percentage=fault_percentage,
-            left_sensor=left_sensor,
-            right_sensor=right_sensor
-        )
+        return jsonify({
+            "prediction": pred_class,
+            "confidence": round(proba[pred], 2),
+            "fault_percentage": fault_percentage
+        })
 
     except Exception as e:
-        return f"Error: {str(e)}"
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=10000)
