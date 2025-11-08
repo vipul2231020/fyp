@@ -151,6 +151,7 @@ void blinkLed(int mil)
 }
 
 uint32_t lcd_update_time = 0;
+bool aiFaultDetected = false;
 
 void setup()
 {
@@ -179,24 +180,40 @@ void runMLPrediction()
     else
         result = "Break";
 
+    // static flag to keep last state
+    static bool faultDetected = false;
+
     // 🔹 AI severity and percentage logic
     if (pred == 0)
     {
+        faultDetected = false; // reset when normal
         fault_percent = random(1, 10);
         severity = "Safe";
         ai_class = "success";
     }
-    else if (pred == 1 || pred == 2)
-    {
-        fault_percent = random(45, 75);
-        severity = "Moderate";
-        ai_class = "warning";
-    }
     else
     {
-        fault_percent = random(85, 100);
-        severity = "Critical";
-        ai_class = "danger";
+        // generate random only once when fault first appears
+        if (!faultDetected)
+        {
+            if (pred == 1 || pred == 2)
+                fault_percent = random(45, 75);
+            else
+                fault_percent = random(85, 100);
+        }
+
+        faultDetected = true;
+
+        if (pred == 1 || pred == 2)
+        {
+            severity = "Moderate";
+            ai_class = "warning";
+        }
+        else
+        {
+            severity = "Critical";
+            ai_class = "danger";
+        }
     }
 
     ai_status = result;
@@ -208,22 +225,25 @@ void runMLPrediction()
 
     if (pred == 0)
     {
+        aiFaultDetected = false; // fault cleared
         dataPacket.message_class = "success";
         digitalWrite(BUZZER_PIN, LOW);
     }
     else
     {
+        aiFaultDetected = true; // fault active
         dataPacket.message_class = "danger";
         digitalWrite(BUZZER_PIN, HIGH);
 
-        // 🛑 NEW: Stop motor immediately when fault detected
+        // Auto stop train only once per fault detection
         digitalWrite(MLP_PIN, LOW);
         digitalWrite(MLN_PIN, LOW);
+
+        // Update dashboard
         dataPacket.btn_fwd_class = "success";
         dataPacket.btn_stop_class = "danger";
         dataPacket.btn_back_class = "success";
 
-        // Update dashboard message
         dataPacket.message = "⚠ " + result + " detected! Train Stopped 🚨 | Fault: " +
                              String(fault_percent) + "% | Severity: " + severity;
     }
@@ -248,7 +268,9 @@ void loop()
             dataPacket.btn_back_class = "success";
             digitalWrite(MLP_PIN, HIGH);
             digitalWrite(MLN_PIN, LOW);
+            aiFaultDetected = false; // override: user manually resumes
         }
+
         if (userBtnAction == btnAction.BTN_STOP)
         {
             dataPacket.btn_fwd_class = "success";
@@ -257,6 +279,7 @@ void loop()
             digitalWrite(MLP_PIN, LOW);
             digitalWrite(MLN_PIN, LOW);
         }
+
         if (userBtnAction == btnAction.BTN_BACK)
         {
             dataPacket.btn_fwd_class = "success";
@@ -264,7 +287,9 @@ void loop()
             dataPacket.btn_back_class = "danger";
             digitalWrite(MLP_PIN, LOW);
             digitalWrite(MLN_PIN, HIGH);
+            aiFaultDetected = false; // override: user manually resumes
         }
+
         userBtnAction = btnAction.BTN_NONE;
     }
 
@@ -495,7 +520,7 @@ String getTemplate()
            "\n"
            "\n"
            "<div class=\"card primary\" id=\"location\">\n"
-           "<a href=\"https://maps.app.goo.gl/7zk4y9V2Y6hn4wry6\">\n"
+           "<a href=\"https://maps.app.goo.gl/Wmyqr1H4hy8awwjN7\">\n"
            "<span>\n"
            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"48\" height=\"48\" fill=\"white\" class=\"bi bi-thermometer-half\" viewBox=\"0 0 16 16\">\n"
            "<path fill-rule=\"evenodd\" d=\"M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8\"/>\n"
